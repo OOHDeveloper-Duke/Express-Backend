@@ -14,6 +14,11 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+var index = require('./routes/index');
+app.use('/', index);
+
+var rooms = require('./routes/rooms');
+app.use('/rooms', rooms);
 
 //Deployment
 var port = 3000;
