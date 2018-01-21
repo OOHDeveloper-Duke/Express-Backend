@@ -59,9 +59,60 @@ router.get('/', function(req, res, next) {
           for(let room of rooms) { //room.roomid.id is of type Buffer, need to use toString('hex') for comparisoin. Currently inefficient, need improvement
             room.status = activeRooms.indexOf(room.roomid.id.toString('hex'))>-1 ? 'active':'inactive';
           }
+          res.status(200);
           res.send(rooms);
         }
       });
+    }
+  });
+});
+
+/*
+  This function allows the deletion of an OOH room
+*/
+router.delete('/:roomid', function(req, res, next) {
+  var roomid = req.params.roomid;
+  Room.deleteOne({_id: roomid}).exec(function(err, opResult) {
+    if(err) {
+      res.status(500);
+      res.send('MongoDB Error: Unable to delete room');
+    } else {
+      redis.del('room:'+roomid+':*', function(err, opResult) {
+        if(err) {
+          res.status(500);
+          res.send('Redis Error: Unable to clear room registry');
+        } else {
+          res.status(204);
+          res.send();
+        }
+      });
+    }
+  });
+});
+
+
+/* */
+router.get('/:roomid', function(req, res, next) {
+  var roomid = req.params.roomid;
+  Room.findOne({_id: roomid}).lean().exec(function(err, room) {
+    if(err) {
+      res.status(500);
+      res.send('MongoDB Error: Unable to retrieve room information');
+    } else {
+      room.roomid = room._id;
+      delete room._id;
+      delete room.__v;
+      redis.get('room:'+roomid+':status', function(err, status) {
+        if(err) {
+          res.status(500);
+          res.send('Redis Error: Unable to retrieve some information from redis');
+        } else {
+          res.status(200);
+          if(!status || status=='inactive') res.send('inactive');
+          else res.send('active');
+        }
+      });
+      //res.send(room);
     }
   });
 });
