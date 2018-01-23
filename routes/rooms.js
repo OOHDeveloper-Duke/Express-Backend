@@ -210,10 +210,50 @@ router.get('/:roomid/students', function(req, res, next) {
       res.send('Redis Error: Unable to retrieve the list of students');
     } else {
       res.status(200);
-      console.log(students);
       res.send({students_in_room: students ? students : []});
     }
   });
 });
 
+/*
+  This function allows adding a student to a room
+*/
+router.put('/:roomid/students/:netid', function(req, res, next) {
+  var roomid = req.params.roomid;
+  var netid = req.params.netid;
+  redis.sadd('room:'+roomid+':students', netid, function(err, opResult) {
+    if(err) {
+      res.status(500);
+      res.send('Redis Error: Unable to add student to room');
+    } else {
+      redis.smembers('room:'+roomid+':students', function(err, students) {
+        if(err) {
+          res.status(500);
+          res.send('Redis Error: Unable to retrieve the list of students');
+        } else {
+          res.status(200);
+          var time = new Date();
+          res.send({roomid: roomid, students_in_room: students ? students : [], updated_at: time.toISOString()});
+        }
+      });
+    }
+  });
+});
+
+/*
+  This function allows removal a student from a room
+*/
+router.delete('/:roomid/students/:netid', function(req, res, next) {
+  var roomid = req.params.roomid;
+  var netid = req.params.netid;
+  redis.srem('room:'+roomid+':students', netid, function(err, opResult) {
+    if(err) {
+      res.status(500);
+      res.send('Redis Error: Unable to remove student from room');
+    } else {
+      res.status(204);
+      res.send();
+    }
+  });
+});
 module.exports = router;
