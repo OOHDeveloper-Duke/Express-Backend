@@ -241,7 +241,7 @@ router.put('/:roomid/students/:netid', function(req, res, next) {
 });
 
 /*
-  This function allows removal a student from a room
+  This function allows removal of a student from a room
 */
 router.delete('/:roomid/students/:netid', function(req, res, next) {
   var roomid = req.params.roomid;
@@ -256,4 +256,105 @@ router.delete('/:roomid/students/:netid', function(req, res, next) {
     }
   });
 });
+
+/*
+  This function allows the retrieval of the queue in the room
+*/
+router.get('/:roomid/queue', function(req, res, next) {
+  var roomid = req.params.roomid;
+  redis.lrange('room:'+roomid+':queue', 0, -1, function(err, queueEntries) {
+    if(err) {
+      res.status(500);
+      res.send('Redis Error: Unable to retrieve the queue');
+    } else {
+      var queue = [];
+      for(let entry of queueEntries) {
+        queue.push(JSON.parse(entry));
+      }
+      res.status(200);
+      var time = new Date();
+      res.send({queue: queue, updated_at: time.toISOString()});
+    }
+  });
+});
+
+/*
+  This function allows the addition of an entry to the queue
+*/
+router.put('/:roomid/queue', function(req, res, next) {
+  var roomid = req.params.roomid;
+  var netid = req.body.netid;
+  var name = req.body.name;
+  var question = req.body.question;
+  if(!question || !name || !netid) {
+    res.status(400);
+    res.send("Request data is incomplete");
+  } else {
+    var entry = {netid: netid, name: name, question: question};
+    redis.rpush('room:'+roomid+':queue', JSON.stringify(entry), function(err, opResult) {
+      if(err) {
+        res.status(500);
+        res.send('Redis Error: Unable to add entry to queue');
+      } else {
+        redis.lrange('room:'+roomid+':queue', 0, -1, function(err, queueEntries) {
+          if(err) {
+            res.status(500);
+            res.send('Redis Error: Unable to retrieve the queue');
+          } else {
+            var queue = [];
+            for(let entry of queueEntries) {
+              queue.push(JSON.parse(entry));
+            }
+            res.status(200);
+            var time = new Date();
+            res.send({queue: queue, updated_at: time.toISOString()});
+          }
+        });
+      }
+    })
+  }
+});
+
+/*
+  This function allows the removal of
+*/
+router.delete('/:roomid/queue/:netid', function(req, res, next) {
+  var roomid = req.params.roomid;
+  var netid = req.params.netid;
+  //Currently very inefficient, could find ways to improve performance
+  redis.lrange('room:'+roomid+':queue', 0, -1, function(err, queueEntries) {
+    if(err) {
+      res.status(500);
+      res.send('Redis Error: Unable to retrieve the queue');
+    } else {
+      var queue = [];
+      var toRemoveValue;
+      for(let i=0; i<queueEntries.length; i++) {
+        let entry = JSON.parse(queueEntries[i]);
+        if(entry.netid != netid) {
+          queue.push(entry);
+        } else {
+          toRemoveValue = queueEntries[i];
+        }
+      }
+      if(toRemoveValue) {
+        redis.lrem('room:'+roomid+':queue', 0, toRemoveValue, function(err, opResult) {
+          if(err) {
+            res.status(500);
+            res.send('Redis Error: Unable to remove entry from the queue');
+          } else {
+            res.status(200);
+            var time = new Date();
+            res.send({queue: queue, updated_at: time.toISOString()});
+          }
+        });
+      } else {
+        res.status(200);
+        var time = new Date();
+        res.send({queue: queue, updated_at: time.toISOString()});
+      }
+    }
+  });
+});
+
 module.exports = router;
