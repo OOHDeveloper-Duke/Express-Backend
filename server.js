@@ -20,6 +20,9 @@ app.use('/', index);
 var rooms = require('./routes/rooms');
 app.use('/rooms', rooms);
 
+var login = require('./routes/login');
+app.use('/login', login);
+
 //Deployment
 var port = 3000;
 app.listen(port, function() {
